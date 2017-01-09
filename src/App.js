@@ -18,10 +18,29 @@ class App extends Component {
   }
 }
 
-const SampleComponent = () => (
-  <div>
-    <input type="text" name="bar" value="baz" />
-  </div>
-);
+var tw = 1500000;
+
+function getTimeRemaining(consumed = 0) {
+  var t = tw - consumed;
+  tw = t;
+  var minute = Math.floor((t/1000/60) % 60);
+  var seconds = Math.floor((t/1000) % 60);
+  return {
+    minute, seconds
+  };
+}
+
+function initializedClock() {
+  var timeInterval = setInterval(() => {
+    var timex = getTimeRemaining(1000);
+    console.log(timex.minute,' : ',timex.seconds);
+    if (timex.t <= 0) {
+      clearInterval(timeInterval);
+    }
+  }, 1000);
+}
+
+initializedClock();
+
 
 export default App;
