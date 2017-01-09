@@ -33,7 +33,7 @@ function getTimeRemaining(consumed = 0) {
 function initializedClock() {
   var timeInterval = setInterval(() => {
     var timex = getTimeRemaining(1000);
-    console.log(timex.minute,' : ',timex.seconds);
+    console.log(timex.minute,' : ',('0' + timex.seconds).slice(-2));
     if (timex.t <= 0) {
       clearInterval(timeInterval);
     }
