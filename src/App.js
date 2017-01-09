@@ -18,4 +18,10 @@ class App extends Component {
   }
 }
 
+const SampleComponent = () => (
+  <div>
+    <input type="text" name="bar" value="baz" />
+  </div>
+);
+
 export default App;
