@@ -1,6 +1,7 @@
 import React from 'react';
 import {createStore} from 'redux';
 import {connect} from 'react-redux';
+import throttle from 'lodash/throttle'
 import './App.css';
 
 // action  creators - start script
@@ -24,7 +25,15 @@ const decrementRest = (lessRest) => ({
   lessRest,
 });
 
-const tickTimer = (workInMilliseconds, restInMilliseconds) => ({
+const startTimer = () => ({
+  type: 'START_TIMER'
+})
+
+const stopTimer = () => ({
+  type: 'STOP_TIMER'
+})
+
+const tickTimer = (minutes, seconds, workInMilliseconds) => ({
   type: 'TICK_TIMER',
   minutes,
   seconds,
@@ -76,17 +85,26 @@ const PomoReducer = (state = initialState, action) => {
         rest: state.rest - action.lessRest,
         restInMilliseconds: state.restInMilliseconds - 60000,
       });
+    case 'START_TIMER':
+      return Object.assign({}, state, {
+        ticked: true,
+      });
+    case 'STOP_TIMER':
+      return Object.assign({}, state, {
+        ticked: false,
+      });
     case 'TICK_TIMER':
       return Object.assign({}, state, {
-        minutes: action.minutes.toString(),
-        seconds: ('0' + action.seconds.toString()).slice(-2),
+        minutes: action.minutes,
+        seconds: action.seconds,
         workInMilliseconds: action.workInMilliseconds,
-        ticked: !state.ticked,
       });
     default:
       return state;
   }
 }
+
+export const store = createStore(PomoReducer);
 // reducers - end script
 
 /*-----------------------------------------------------------------------*/
@@ -101,10 +119,11 @@ const Pomodoro = ({
   work,
   minutes,
   seconds,
-  clickTimer,
+  start,
+  stop,
+
   ticked,
-  workInMilliseconds,
-  restInMilliseconds,
+
 }) => (
   <div>
     <button
@@ -117,14 +136,14 @@ const Pomodoro = ({
       onClick={() => increaseRest(1)}>+</button>
 
     {' '}<span 
+          style={{color: ticked ? "blue" : "red"}}
           onClick={() => {
-            let timeInterval = setInterval(() => {
-              if (workInMilliseconds <= 0) {
-                clearInterval(timeInterval);
-              }
-              clickTimer(workInMilliseconds);
-            }, 1000)
-          }}>{minutes}:{seconds}</span>{' '}
+            if (ticked) {
+              stop();
+            }
+            start();
+          }}
+        >{minutes}:{seconds}</span>{' '}
 
     <button
       classID="workBtn" 
@@ -144,12 +163,12 @@ const Pomodoro = ({
 const mapStateToProps = (state) => ({
   rest: state.rest,
   work: state.work,
-  minutes: state.minutes,
-  seconds: state.seconds,
-  workInMilliseconds: state.workInMilliseconds,
-  restInMilliseconds: state.restInMilliseconds,
+  minutes: state.minutes.toString(),
+  seconds: ('0' + state.seconds.toString()).slice(-2),
+
   ticked: state.ticked,
 });
+
 
 const mapDispatchToProps = (dispatch) => ({
   increaseRest: (plusRest) => {
@@ -164,26 +183,57 @@ const mapDispatchToProps = (dispatch) => ({
   decreaseWork: (lessTime) => {
     dispatch(decrementWork(lessTime));
   },
-  clickTimer: (workInMilliseconds) => {
-    let timex = getTimeRemaining(workInMilliseconds);
-    console.log(timex);
-    dispatch(tickTimer(timex.minutes, timex.seconds, timex.workInMilliseconds));
-  }
+  start: () => {
+    dispatch(startTimer());
+  },
+  stop: () => {
+    dispatch(stopTimer());
+  },
 });
 
-export const store = createStore(PomoReducer);
 export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
 // containers - end script
 
 /*-----------------------------------------------------------------------*/
+let timeInterval = null;
+store.subscribe(() => {
+  if (store.getState().ticked && store.getState().workInMilliseconds > 0) {
+    timeInterval = setInterval(() => {
+      let t = getTimeRemaining(store.getState().workInMilliseconds);
+      console.log(t);
+      store.dispatch(tickTimer(t.minutes, t.seconds, t.tr));
+    }, 2000)
+  }
+  if (!store.getState().ticked) {
+    clearInterval(timeInterval);
+    timeInterval = null;
+  }
+})
+
 function getTimeRemaining(timeRemaining) {
-  var workInMilliseconds = timeRemaining - 1000;
-  var minutes = Math.floor((workInMilliseconds/1000/60) % 60);
-  var seconds = Math.floor((workInMilliseconds/1000) % 60);
+  const tr = timeRemaining - 1000;
+  let minutes = Math.floor((tr/1000/60) % 60);
+  let seconds = Math.floor((tr/1000) % 60);
   return {
-    minutes, seconds, workInMilliseconds
+    tr,
+    minutes, 
+    seconds, 
   };
 }
+
+/**  componentWillMount: (workInMilliseconds) => {
+    if (workInMilliseconds > 0) {
+      timeInterval = setInterval(() => {
+        let timex = getTimeRemaining(workInMilliseconds);
+        dispatch(tickTimer(timex.minutes, timex.seconds, timex.workInMilliseconds));
+      }, 1000)
+    }
+    if (workInMilliseconds === 0) {
+      clearInterval(timeInterval);
+      timeInterval = null;
+    }
+  },
+*/
 /*
 function initializedClock(timeRemaining) {
   var timeInterval = setInterval(() => {
