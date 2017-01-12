@@ -25,8 +25,9 @@ const decrementRest = (lessRest) => ({
   lessRest,
 });
 
-const startTimer = () => ({
-  type: 'START_TIMER'
+const startTimer = (workInMilliseconds) => ({
+  type: 'START_TIMER',
+  workInMilliseconds,
 })
 
 const stopTimer = (workInMilliseconds) => ({
@@ -50,6 +51,7 @@ const initialState = {
   workInMilliseconds: 1500000,
   restInMilliseconds: 300000,
   ticked: false,
+  paused: false,
 };
 
 const PomoReducer = (state = initialState, action) => {
@@ -82,10 +84,13 @@ const PomoReducer = (state = initialState, action) => {
       });
     case 'START_TIMER':
       return Object.assign({}, state, {
+        paused: false,
         ticked: true,
+        workInMilliseconds: state.paused ? (action.workInMilliseconds - 1000) : state.workInMilliseconds
       });
     case 'STOP_TIMER':
       return Object.assign({}, state, {
+        paused: true,
         ticked: false,
         workInMilliseconds: action.workInMilliseconds,
       });
@@ -133,7 +138,7 @@ const Pomodoro = ({
             if (ticked) {
               return stop(workInMilliseconds);
             }
-            return start();
+            return start(workInMilliseconds);
           }}
         >{tr.minutes}:{tr.seconds}</span>{' '}
 
@@ -174,8 +179,8 @@ const mapDispatchToProps = (dispatch) => ({
   decreaseWork: (lessTime) => {
     dispatch(decrementWork(lessTime));
   },
-  start: () => {
-    dispatch(startTimer());
+  start: (workInMilliseconds) => {
+    dispatch(startTimer(workInMilliseconds));
   },
   stop: (workInMilliseconds) => {
     dispatch(stopTimer(workInMilliseconds));
@@ -184,13 +189,19 @@ const mapDispatchToProps = (dispatch) => ({
 
 let timeInterval = null;
 store.subscribe(() => {
-  timeInterval = setInterval(() => {
-    if (store.getState().ticked && (store.getState().workInMilliseconds > 0)) {
-      store.dispatch(tickTimer(store.getState().workInMilliseconds - 1000));
-    }
+  if (store.getState().ticked && (store.getState().workInMilliseconds > 0)) {
     clearInterval(timeInterval);
-    timeInterval = 0;
-  }, 1000);
+    timeInterval = setInterval(() => {
+      if (store.getState().ticked && (store.getState().workInMilliseconds > 0)) {
+        store.dispatch(tickTimer(store.getState().workInMilliseconds - 1000));
+      }
+      //clearInterval(timeInterval);
+      //timeInterval = null;
+    }, 1000);
+  }
+  if (!store.getState().ticked) {
+    clearInterval(timeInterval);
+  }
   console.log(store.getState());
   console.log('interval value: ', timeInterval);
   /**
@@ -205,11 +216,6 @@ export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
 // containers - end script
 
 /*-----------------------------------------------------------------------*/
-
-const clear = document.querySelector('#clear');
-clear.addEventListener('click', () => {
-  clearInterval(timeInterval);
-})
 
 function getTimeRemaining(timeRemaining) {
   let minutes = (Math.floor((timeRemaining/1000/60) % 60)).toString();
