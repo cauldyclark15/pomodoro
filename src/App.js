@@ -1,7 +1,7 @@
 import React from 'react';
 import {createStore} from 'redux';
 import {connect} from 'react-redux';
-import throttle from 'lodash/throttle'
+//import throttle from 'lodash/throttle'
 import './App.css';
 
 // action  creators - start script
@@ -33,10 +33,8 @@ const stopTimer = () => ({
   type: 'STOP_TIMER'
 })
 
-const tickTimer = (minutes, seconds, workInMilliseconds) => ({
+const tickTimer = (workInMilliseconds) => ({
   type: 'TICK_TIMER',
-  minutes,
-  seconds,
   workInMilliseconds,
   //restInMilliseconds,
 });
@@ -50,8 +48,6 @@ const initialState = {
   work: 25,
   workInMilliseconds: 1500000,
   restInMilliseconds: 300000,
-  minutes: '25',
-  seconds: '00',
   ticked: false,
 };
 
@@ -61,7 +57,6 @@ const PomoReducer = (state = initialState, action) => {
       return Object.assign({}, state, {
         work: state.work + action.plusTime,
         workInMilliseconds: state.workInMilliseconds + 60000,
-        minutes: (state.work + action.plusTime).toString(),
       });
     case 'DEC_WORK':
       if (state.work === 1) {
@@ -70,7 +65,6 @@ const PomoReducer = (state = initialState, action) => {
       return Object.assign({}, state, {
         work: state.work - action.lessTime,
         workInMilliseconds: state.workInMilliseconds - 60000,
-        minutes: (state.work - action.lessTime).toString(),
       });
     case 'INC_REST':
       return Object.assign({}, state, {
@@ -95,8 +89,6 @@ const PomoReducer = (state = initialState, action) => {
       });
     case 'TICK_TIMER':
       return Object.assign({}, state, {
-        minutes: action.minutes,
-        seconds: action.seconds,
         workInMilliseconds: action.workInMilliseconds,
       });
     default:
@@ -117,8 +109,7 @@ const Pomodoro = ({
   increaseWork,
   decreaseWork,
   work,
-  minutes,
-  seconds,
+  tr,
   start,
   stop,
 
@@ -139,11 +130,11 @@ const Pomodoro = ({
           style={{color: ticked ? "blue" : "red"}}
           onClick={() => {
             if (ticked) {
-              stop();
+              return stop();
             }
-            start();
+            return start();
           }}
-        >{minutes}:{seconds}</span>{' '}
+        >{tr.minutes}:{tr.seconds}</span>{' '}
 
     <button
       classID="workBtn" 
@@ -163,9 +154,7 @@ const Pomodoro = ({
 const mapStateToProps = (state) => ({
   rest: state.rest,
   work: state.work,
-  minutes: state.minutes.toString(),
-  seconds: ('0' + state.seconds.toString()).slice(-2),
-
+  tr: getTimeRemaining(state.workInMilliseconds),
   ticked: state.ticked,
 });
 
@@ -191,31 +180,36 @@ const mapDispatchToProps = (dispatch) => ({
   },
 });
 
-export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
-// containers - end script
-
-/*-----------------------------------------------------------------------*/
 let timeInterval = null;
+let dummyTime = 1500000;
 store.subscribe(() => {
-  if (store.getState().ticked && store.getState().workInMilliseconds > 0) {
+  if (store.getState().ticked && (dummyTime > 0)) {
     timeInterval = setInterval(() => {
-      let t = getTimeRemaining(store.getState().workInMilliseconds);
-      console.log(t);
-      store.dispatch(tickTimer(t.minutes, t.seconds, t.tr));
-    }, 2000)
+      store.dispatch(tickTimer(dummyTime - 1000));
+      dummyTime = dummyTime - 1000;
+    }, 1000);
   }
+  console.log(store.getState());
   if (!store.getState().ticked) {
     clearInterval(timeInterval);
     timeInterval = null;
   }
 })
 
+export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
+// containers - end script
+
+/*-----------------------------------------------------------------------*/
+
+const clear = document.querySelector('#clear');
+clear.addEventListener('click', () => {
+  clearInterval(timeInterval);
+})
+
 function getTimeRemaining(timeRemaining) {
-  const tr = timeRemaining - 1000;
-  let minutes = Math.floor((tr/1000/60) % 60);
-  let seconds = Math.floor((tr/1000) % 60);
+  let minutes = (Math.floor((timeRemaining/1000/60) % 60)).toString();
+  let seconds = ('0' + (Math.floor((timeRemaining/1000) % 60)).toString()).slice(-2);
   return {
-    tr,
     minutes, 
     seconds, 
   };
