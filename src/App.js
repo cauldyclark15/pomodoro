@@ -29,8 +29,9 @@ const startTimer = () => ({
   type: 'START_TIMER'
 })
 
-const stopTimer = () => ({
-  type: 'STOP_TIMER'
+const stopTimer = (workInMilliseconds) => ({
+  type: 'STOP_TIMER',
+  workInMilliseconds,
 })
 
 const tickTimer = (workInMilliseconds) => ({
@@ -86,6 +87,7 @@ const PomoReducer = (state = initialState, action) => {
     case 'STOP_TIMER':
       return Object.assign({}, state, {
         ticked: false,
+        workInMilliseconds: action.workInMilliseconds,
       });
     case 'TICK_TIMER':
       return Object.assign({}, state, {
@@ -112,9 +114,8 @@ const Pomodoro = ({
   tr,
   start,
   stop,
-
+  workInMilliseconds,
   ticked,
-
 }) => (
   <div>
     <button
@@ -130,7 +131,7 @@ const Pomodoro = ({
           style={{color: ticked ? "blue" : "red"}}
           onClick={() => {
             if (ticked) {
-              return stop();
+              return stop(workInMilliseconds);
             }
             return start();
           }}
@@ -154,6 +155,7 @@ const Pomodoro = ({
 const mapStateToProps = (state) => ({
   rest: state.rest,
   work: state.work,
+  workInMilliseconds: state.workInMilliseconds,
   tr: getTimeRemaining(state.workInMilliseconds),
   ticked: state.ticked,
 });
@@ -175,25 +177,28 @@ const mapDispatchToProps = (dispatch) => ({
   start: () => {
     dispatch(startTimer());
   },
-  stop: () => {
-    dispatch(stopTimer());
+  stop: (workInMilliseconds) => {
+    dispatch(stopTimer(workInMilliseconds));
   },
 });
 
 let timeInterval = null;
-let dummyTime = 1500000;
 store.subscribe(() => {
-  if (store.getState().ticked && (dummyTime > 0)) {
-    timeInterval = setInterval(() => {
-      store.dispatch(tickTimer(dummyTime - 1000));
-      dummyTime = dummyTime - 1000;
-    }, 1000);
-  }
+  timeInterval = setInterval(() => {
+    if (store.getState().ticked && (store.getState().workInMilliseconds > 0)) {
+      store.dispatch(tickTimer(store.getState().workInMilliseconds - 1000));
+    }
+    clearInterval(timeInterval);
+    timeInterval = 0;
+  }, 1000);
   console.log(store.getState());
+  console.log('interval value: ', timeInterval);
+  /**
   if (!store.getState().ticked) {
     clearInterval(timeInterval);
     timeInterval = null;
   }
+  */
 })
 
 export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
