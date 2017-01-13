@@ -1,7 +1,6 @@
 import React from 'react';
 import {createStore} from 'redux';
 import {connect} from 'react-redux';
-//import throttle from 'lodash/throttle'
 import './App.css';
 
 // action  creators - start script
@@ -28,17 +27,21 @@ const decrementRest = (lessRest) => ({
 const startTimer = (workInMilliseconds) => ({
   type: 'START_TIMER',
   workInMilliseconds,
-})
+});
 
 const stopTimer = (workInMilliseconds) => ({
   type: 'STOP_TIMER',
   workInMilliseconds,
 })
 
-const tickTimer = (workInMilliseconds) => ({
+const workTimer = (workInMilliseconds) => ({
   type: 'TICK_TIMER',
   workInMilliseconds,
-  //restInMilliseconds,
+});
+
+const restTimer = (restInMilliseconds) => ({
+  type: 'TICK_REST',
+  restInMilliseconds,
 });
 // action creators - end script
 
@@ -51,7 +54,7 @@ const initialState = {
   workInMilliseconds: 1500000,
   restInMilliseconds: 300000,
   ticked: false,
-  paused: false,
+  resting: false,
 };
 
 const PomoReducer = (state = initialState, action) => {
@@ -83,12 +86,21 @@ const PomoReducer = (state = initialState, action) => {
         restInMilliseconds: state.restInMilliseconds - 60000,
       });
     case 'START_TIMER':
+      if (action.workInMilliseconds === 0) {
+        return Object.assign({}, state, {
+          workInMilliseconds: state.work * 60 * 1000,
+          restInMilliseconds: state.rest * 60 * 1000,
+          resting: false,
+        });
+      }
       return Object.assign({}, state, {
-        paused: false,
+        workInMilliseconds: state.ticked ? (action.workInMilliseconds - 1000) : state.workInMilliseconds,
         ticked: true,
-        workInMilliseconds: state.paused ? (action.workInMilliseconds - 1000) : state.workInMilliseconds
       });
     case 'STOP_TIMER':
+      if (state.resting) {
+        return state;
+      }
       return Object.assign({}, state, {
         paused: true,
         ticked: false,
@@ -97,6 +109,11 @@ const PomoReducer = (state = initialState, action) => {
     case 'TICK_TIMER':
       return Object.assign({}, state, {
         workInMilliseconds: action.workInMilliseconds,
+      });
+    case 'TICK_REST':
+      return Object.assign({}, state, {
+        restInMilliseconds: action.restInMilliseconds,
+        resting: true,
       });
     default:
       return state;
@@ -121,10 +138,11 @@ const Pomodoro = ({
   stop,
   workInMilliseconds,
   ticked,
+  resting,
 }) => (
   <div>
     <button
-      classID="restBtn" 
+      className="restBtn" 
       onClick={() => decreaseRest(1)}>-</button>
 
     {' '}<span>{rest}</span>{' '}
@@ -143,13 +161,16 @@ const Pomodoro = ({
         >{tr.minutes}:{tr.seconds}</span>{' '}
 
     <button
-      classID="workBtn" 
+      className="workBtn" 
       onClick={() => decreaseWork(1)}>-</button>
 
     {' '}<span>{work}</span>{' '}
 
     <button 
       onClick={() => increaseWork(1)}>+</button>
+    <p
+      style={{visibility: resting ? "visible" : "hidden"}}
+    >Breaktime</p>
   </div>
 );
 // components - end script
@@ -161,10 +182,10 @@ const mapStateToProps = (state) => ({
   rest: state.rest,
   work: state.work,
   workInMilliseconds: state.workInMilliseconds,
-  tr: getTimeRemaining(state.workInMilliseconds),
+  tr: state.workInMilliseconds === 0 ? getTimeRemaining(state.restInMilliseconds) : getTimeRemaining(state.workInMilliseconds),
   ticked: state.ticked,
+  resting: state.resting,
 });
-
 
 const mapDispatchToProps = (dispatch) => ({
   increaseRest: (plusRest) => {
@@ -189,27 +210,25 @@ const mapDispatchToProps = (dispatch) => ({
 
 let timeInterval = null;
 store.subscribe(() => {
-  if (store.getState().ticked && (store.getState().workInMilliseconds > 0)) {
+  let status = store.getState();
+  if (status.ticked && (status.workInMilliseconds > 0)) {
     clearInterval(timeInterval);
     timeInterval = setInterval(() => {
-      if (store.getState().ticked && (store.getState().workInMilliseconds > 0)) {
-        store.dispatch(tickTimer(store.getState().workInMilliseconds - 1000));
-      }
-      //clearInterval(timeInterval);
-      //timeInterval = null;
+      store.dispatch(workTimer(status.workInMilliseconds - 1000));
     }, 1000);
   }
-  if (!store.getState().ticked) {
+  if (status.workInMilliseconds === 0 && status.restInMilliseconds === 0) {
+    store.dispatch(startTimer(status.workInMilliseconds));
+  } else if(status.workInMilliseconds === 0) {
     clearInterval(timeInterval);
+    timeInterval = setInterval(() => {
+      store.dispatch(restTimer(status.restInMilliseconds - 1000));
+    }, 1000)
   }
-  console.log(store.getState());
-  console.log('interval value: ', timeInterval);
-  /**
-  if (!store.getState().ticked) {
+  if (!status.ticked && !status.resting) {
     clearInterval(timeInterval);
     timeInterval = null;
   }
-  */
 })
 
 export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
@@ -217,6 +236,7 @@ export const App = connect(mapStateToProps, mapDispatchToProps)(Pomodoro);
 
 /*-----------------------------------------------------------------------*/
 
+// helper functions - start script
 function getTimeRemaining(timeRemaining) {
   let minutes = (Math.floor((timeRemaining/1000/60) % 60)).toString();
   let seconds = ('0' + (Math.floor((timeRemaining/1000) % 60)).toString()).slice(-2);
@@ -225,27 +245,3 @@ function getTimeRemaining(timeRemaining) {
     seconds, 
   };
 }
-
-/**  componentWillMount: (workInMilliseconds) => {
-    if (workInMilliseconds > 0) {
-      timeInterval = setInterval(() => {
-        let timex = getTimeRemaining(workInMilliseconds);
-        dispatch(tickTimer(timex.minutes, timex.seconds, timex.workInMilliseconds));
-      }, 1000)
-    }
-    if (workInMilliseconds === 0) {
-      clearInterval(timeInterval);
-      timeInterval = null;
-    }
-  },
-*/
-/*
-function initializedClock(timeRemaining) {
-  var timeInterval = setInterval(() => {
-    var timex = getTimeRemaining(timeRemaining);
-    if (timex.t <= 0) {
-      clearInterval(timeInterval);
-    }
-  }, 1000);
-}
-*/
